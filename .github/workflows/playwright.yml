@@ -1,0 +1,48 @@
+name: Playwright API Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Playwright API Tests
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Cache node_modules
+        uses: actions/cache@v5
+        id: node-cache
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.node-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Run Playwright tests
+        env:
+          # Public demo credentials for Restful Booker (safe to expose for portfolio/testing purposes)
+          API_BASE_URL: ${{ secrets.API_BASE_URL || 'https://restful-booker.herokuapp.com' }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin' }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'password123' }}
+        run: npx playwright test
+
+      - name: Upload Playwright HTML Report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-api-report
+          path: playwright-api-report/
+          retention-days: 90
+          if-no-files-found: ignore
